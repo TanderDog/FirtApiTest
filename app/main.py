@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from database import add_user, get_users
+from app.database import add_user, get_users
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -15,7 +15,7 @@ class User(BaseModel):
 
 @app.get("/")
 def root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html", {})
 
 
 @app.post("/user")
