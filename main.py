@@ -1,71 +1,29 @@
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Request
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-import psycopg2
+
+from database import add_user, get_users
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
-conn = psycopg2.connect(
-    host="localhost",
-    database="mydb",
-    user="postgres",
-    password="1234",
-    port=5432
-)
-cur = conn.cursor()
-
-cur.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    name TEXT,
-    age INTEGER
-)
-""")
-conn.commit()
 
 class User(BaseModel):
     name: str
     age: int
 
-@app.get("/", response_class=HTMLResponse)
-def root():
-    return """
-    <html>
-        <body>
-            <h1>Мои пользователи</h1>
-            <button onclick="addUser()">Добавить</button>
-            <button onclick="window.location.href='/users'">Показать всех</button>
 
-            <script>
-            async function addUser() {
-                const name = prompt("Введите имя:");
-                const age = prompt("Введите возраст:");
+@app.get("/")
+def root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-                const response = await fetch('/user', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name: name, age: parseInt(age)})
-                });
-                const data = await response.json();
-                alert(data.message);
-            }
-            </script>
-        </body>
-    </html>
-    """
 
 @app.post("/user")
 def create_user(user: User):
-    cur.execute(
-        "INSERT INTO users (name, age) VALUES (%s, %s) RETURNING id",
-        (user.name, user.age)
-    )
-    new_id = cur.fetchone()[0]
-    conn.commit()
+    new_id = add_user(user.name, user.age)
     return {"message": f"Сохранён {user.name}, id={new_id}"}
 
+
 @app.get("/users")
-def get_users():
-    cur.execute("SELECT id, name, age FROM users")
-    rows = cur.fetchall()
-    return [{"id": r[0], "name": r[1], "age": r[2]} for r in rows]
+def read_users():
+    return get_users()

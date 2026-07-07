@@ -1,0 +1,22 @@
+<html>
+        <body>
+            <h1>Мои пользователи</h1>
+            <button onclick="addUser()">Добавить</button>
+            <button onclick="window.location.href='/users'">Показать всех</button>
+
+            <script>
+            async function addUser() {
+                const name = prompt("Введите имя:");
+                const age = prompt("Введите возраст:");
+
+                const response = await fetch('/user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: name, age: parseInt(age)})
+                });
+                const data = await response.json();
+                alert(data.message);
+            }
+            </script>
+        </body>
+    </html>
