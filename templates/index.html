@@ -1,22 +1,62 @@
 <html>
-        <body>
-            <h1>Мои пользователи</h1>
-            <button onclick="addUser()">Добавить</button>
-            <button onclick="window.location.href='/users'">Показать всех</button>
-
-            <script>
-            async function addUser() {
-                const name = prompt("Введите имя:");
-                const age = prompt("Введите возраст:");
-
-                const response = await fetch('/user', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name: name, age: parseInt(age)})
-                });
-                const data = await response.json();
-                alert(data.message);
+    <head>
+        <title>Мои пользователи</title>
+        <style>
+            .mini-window {
+                border: 1px solid #ccc;
+                width: 300px;
+                padding: 10px;
+                max-height: 250px;
+                overflow-y: auto;
             }
-            </script>
-        </body>
-    </html>
+            .card {
+                border-bottom: 1px solid #eee;
+                padding: 5px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Привет!</h1>
+        <p>Всего пользователей: {{ total }}</p>
+ 
+        <button onclick="addUser()">Добавить</button>
+ 
+        <script>
+        async function addUser() {
+            const name = prompt("Введите имя:");
+            const age = prompt("Введите возраст:");
+ 
+            const response = await fetch('/user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name: name, age: parseInt(age)})
+            });
+            const data = await response.json();
+            alert(data.message);
+            window.location.reload();
+        }
+        </script>
+ 
+        <h3>Список пользователей</h3>
+        <div class="mini-window">
+            {% for user in users %}
+            <div class="card">
+                <p>ID: {{ user.id }}</p>
+                <p>Имя: {{ user.name }}</p>
+                <p>Возраст: {{ user.age }}</p>
+            </div>
+            {% endfor %}
+        </div>
+ 
+        <p>Страница {{ page }} из {{ total_pages }}</p>
+ 
+        {% if page > 1 %}
+        <a href="/?page={{ page - 1 }}&size={{ size }}">Назад</a>
+        {% endif %}
+ 
+        {% if page < total_pages %}
+        <a href="/?page={{ page + 1 }}&size={{ size }}">Вперёд</a>
+        {% endif %}
+    </body>
+</html>
+ 
