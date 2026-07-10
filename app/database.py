@@ -1,79 +1,70 @@
-import psycopg2
-from psycopg2 import pool
-from psycopg2.extras import RealDictCursor
-
+import asyncpg
+ 
 connection_pool = None
-
-
-def init_db():
+ 
+ 
+async def init_db():
     global connection_pool
-    connection_pool = pool.ThreadedConnectionPool(
-        minconn=1,
-        maxconn=10,
+    # Было: pool.ThreadedConnectionPool
+    # синхронный пул psycopg2, соединение брали через getconn()/putconn()
+    # Сейчас asyncpg соединяемся acquire(),
+    # а async with - возвращает автоматом.
+    connection_pool = await asyncpg.create_pool(
         host="localhost",
         database="mydb",
         user="postgres",
         password="1234",
         port=5432,
+        min_size=1,
+        max_size=10,
     )
+ 
+    async with connection_pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                age INTEGER NOT NULL
+            )
+        """)
+# Сменен потерн : было psycopg2 + курсор + cur.execute
+# теперь asyncpg + conn. ((($1 и $2 вместо %s, %d))).
+# аналогично освобождаем поток ожиданием await.
 
-    conn = connection_pool.getconn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS users (
-                    id SERIAL PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    age INTEGER NOT NULL
-                )
-            """)
-        conn.commit()
-    finally:
-        connection_pool.putconn(conn)
-
-
-def close_db():
+ 
+async def close_db():
     if connection_pool:
-        connection_pool.closeall()
-
-
-def get_db():
-    conn = connection_pool.getconn()
-    try:
-        cur = conn.cursor(cursor_factory=RealDictCursor)
-        yield cur
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        connection_pool.putconn(conn)
-
-
-def add_user(cur, name: str, age: int):
-    cur.execute(
-        "INSERT INTO users (name, age) VALUES (%s, %s) RETURNING id",
-        (name, age),
+        await connection_pool.close()
+ 
+ 
+async def get_db():
+    async with connection_pool.acquire() as conn:
+        yield conn
+ 
+ 
+async def add_user(conn, name: str, age: int):
+    row = await conn.fetchrow(
+        "INSERT INTO users (name, age) VALUES ($1, $2) RETURNING id",
+        name, age,
     )
-    return cur.fetchone()["id"]
-
-
-def get_users(cur):
-    cur.execute("SELECT id, name, age FROM users")
-    return cur.fetchall()
-
-
-def get_users_paginated(cur, page: int, size: int):
+    return row["id"]
+ 
+ 
+async def get_users(conn):
+    rows = await conn.fetch("SELECT id, name, age FROM users")
+    return [dict(r) for r in rows]
+ 
+ 
+async def get_users_paginated(conn, page: int, size: int):
     offset = (page - 1) * size
  
-    cur.execute("SELECT COUNT(*) AS count FROM users")
-    total = cur.fetchone()["count"]
+    total = await conn.fetchval("SELECT COUNT(*) FROM users")
  
-    cur.execute(
-        "SELECT id, name, age FROM users ORDER BY id LIMIT %s OFFSET %s",
-        (size, offset),
+    rows = await conn.fetch(
+        "SELECT id, name, age FROM users ORDER BY id LIMIT $1 OFFSET $2",
+        size, offset,
     )
-    users = cur.fetchall()
+    users = [dict(r) for r in rows]
  
     total_pages = (total + size - 1) // size if total else 1
  
@@ -84,3 +75,4 @@ def get_users_paginated(cur, page: int, size: int):
         "total": total,
         "total_pages": total_pages,
     }
+ 
