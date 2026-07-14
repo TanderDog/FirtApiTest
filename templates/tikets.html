@@ -1,0 +1,50 @@
+<h3>Тикеты MOEX</h3>
+<div class="mini-window">
+    {% for card in cards %}
+    <div class="card">
+        <p><b>{{ card.secid }}</b></p>
+        <p>
+            {% if card.price is not none %}
+                Цена: {{ "%.2f"|format(card.price) }} ₽
+            {% else %}
+                Цена: н/д
+            {% endif %}
+        </p>
+        <p>
+            {% if card.vs_week.delta is not none %}
+                За 7 дней: {{ "%+.2f"|format(card.vs_week.delta) }} ₽ ({{ "%+.2f"|format(card.vs_week.percent) }}%)
+            {% else %}
+                За 7 дней: недостаточно истории
+            {% endif %}
+        </p>
+        <p>
+            {% if card.volatility is not none %}
+                Волатильность: {{ "%+.2f"|format(card.volatility) }}%
+            {% else %}
+                Волатильность: недостаточно данных
+            {% endif %}
+        </p>
+    </div>
+    {% endfor %}
+</div>
+
+<form method="get" action="/tikets" class="search-form">
+    <input 
+        type="text" 
+        name="extra" 
+        placeholder="Введите код акции, например YDEX" 
+        value="{{ extra or '' }}"
+        style="text-transform: uppercase;"
+    >
+    <button type="submit">Найти</button>
+</form>
+
+<p>Страница {{ page }} из {{ total_pages }}</p>
+
+{% if page > 1 %}
+<a href="/tikets?page={{ page - 1 }}&size={{ size }}{% if extra %}&extra={{ extra }}{% endif %}">Назад</a>
+{% endif %}
+
+{% if page < total_pages %}
+<a href="/tikets?page={{ page + 1 }}&size={{ size }}{% if extra %}&extra={{ extra }}{% endif %}">Вперёд</a>
+{% endif %}
