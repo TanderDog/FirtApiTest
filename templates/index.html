@@ -19,14 +19,14 @@
         <h1>Привет!</h1>
         <p><a href="/tikets">Перейти к котировкам акций →</a></p>
         <p>Всего пользователей: {{ total }}</p>
- 
+
         <button onclick="addUser()">Добавить</button>
- 
+
         <script>
         async function addUser() {
             const name = prompt("Введите имя:");
             const age = prompt("Введите возраст:");
- 
+
             const response = await fetch('/user', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -37,7 +37,7 @@
             window.location.reload();
         }
         </script>
- 
+
         <h3>Список пользователей</h3>
         <div class="mini-window">
             {% for user in users %}
@@ -48,16 +48,15 @@
             </div>
             {% endfor %}
         </div>
- 
+
         <p>Страница {{ page }} из {{ total_pages }}</p>
- 
+
         {% if page > 1 %}
         <a href="/?page={{ page - 1 }}&size={{ size }}">Назад</a>
         {% endif %}
- 
+
         {% if page < total_pages %}
         <a href="/?page={{ page + 1 }}&size={{ size }}">Вперёд</a>
         {% endif %}
     </body>
 </html>
- 

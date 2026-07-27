@@ -1,25 +1,27 @@
 from contextlib import asynccontextmanager
-from datetime import date, timedelta
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
-from app.database import (
-    add_user, get_users_paginated, get_db, init_db, close_db,
-    add_raw, add_daily, get_price_avg, get_daily, get_daily_paginated, 
-    get_price_volatility,
-)
+from app.database import add_user, get_users_paginated, get_db, init_db, close_db
+import app.database as database
 from app.schemas import PaginationParams, User, UserResponse
-from app.moex_api import fetch_prices, fetch_one
-from app.calculations import math_prices
+from app.stocks.repository import TicketsRepository
+from app.stocks.postgres_repo import PostgresTicketsRepository, init_tickets_tables
+from app.stocks.service import get_tickets_page
+from app.stocks.api import MoexApiError
 
 TICKERS = ["SBER", "GAZP", "LKOH", "ROSN"]
 
 
+def get_stocks_repo() -> TicketsRepository:
+    return PostgresTicketsRepository(database.connection_pool)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Добавлен await, переход в event loop на время ожидания 
     await init_db()
+    await init_tickets_tables(database.connection_pool)
     yield
     await close_db()
 
@@ -45,7 +47,7 @@ async def tikets_page(
     request: Request,
     extra: str | None = None,
     pagination: PaginationParams = Depends(),
-    conn=Depends(get_db),
+    repo: TicketsRepository = Depends(get_stocks_repo),
 ):
     tickers = TICKERS.copy()
     if extra:
@@ -53,56 +55,13 @@ async def tikets_page(
         if extra_upper not in tickers:
             tickers.append(extra_upper)
 
-    prices = await fetch_prices(tickers)
-
-    for secid, (today_price, prev_price) in prices.items():
-        await add_raw(conn, secid, today_price)
-        await add_daily(conn, secid, today_price)
-
-        yesterday = date.today() - timedelta(days=1)
-        yesterday_price = await get_daily(conn, secid, yesterday)
-        if yesterday_price is None and prev_price is not None:
-            await add_daily(conn, secid, prev_price, yesterday)
-
-    page_data = await get_daily_paginated(conn, pagination.page, pagination.size)
-
-    cards = []
-    for r in page_data["records"]:
-        avg_price = await get_price_avg(conn, r["secid"])
-        volatility = await get_price_volatility(conn, r["secid"])
-
-        vs_week = math_prices(r["price"], avg_price)
-
-        cards.append({
-            "secid": r["secid"],
-            "price": r["price"],
-            "vs_week": vs_week,
-             "volatility": round(volatility, 2) if volatility is not None else None,
-        })
+    try:
+        page_data = await get_tickets_page(repo, tickers, pagination.page, pagination.size)
+    except MoexApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
 
     return templates.TemplateResponse(
         request,
         "tikets.html",
-        {
-            "cards": cards,
-            "page": page_data["page"],
-            "size": page_data["size"],
-            "total": page_data["total"],
-            "total_pages": page_data["total_pages"],
-            "extra": extra,
-        },
+        {**page_data, "extra": extra},
     )
-
-
-async def sync_and_compare(conn, secid: str, today_price: float, prev_price: float | None):
-    await add_raw(conn, secid, today_price)
-    await add_daily(conn, secid, today_price)
-
-    yesterday = date.today() - timedelta(days=1)
-    yesterday_price = await get_daily(conn, secid, yesterday)
-
-    if yesterday_price is None and prev_price is not None:
-        await add_daily(conn, secid, prev_price, yesterday)
-        yesterday_price = prev_price
-
-    return math_prices(today_price, yesterday_price)
