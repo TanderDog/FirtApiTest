@@ -7,7 +7,7 @@ from app.database import add_user, get_users_paginated, get_db, init_db, close_d
 import app.database as database
 from app.schemas import PaginationParams, User, UserResponse
 from app.stocks.repository import TicketsRepository
-from app.stocks.postgres_repo import PostgresTicketsRepository, init_tickets_tables
+from app.stocks.postgres_repo import PostgresTicketsRepository
 from app.stocks.service import get_tickets_page
 from app.stocks.api import MoexApiError
 
@@ -21,7 +21,6 @@ def get_stocks_repo() -> TicketsRepository:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    await init_tickets_tables(database.connection_pool)
     yield
     await close_db()
 
