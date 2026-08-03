@@ -1,6 +1,6 @@
 import asyncpg
 
-from app.config import DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_PORT
+from app.config import settings
 
 connection_pool = None
 
@@ -8,14 +8,14 @@ connection_pool = None
 async def init_db():
     global connection_pool
     connection_pool = await asyncpg.create_pool(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD,
-        port=DB_PORT,
+        host=settings.db_host,
+        database=settings.db_name,
+        user=settings.db_user,
+        password=settings.db_password,
+        port=settings.db_port,
         min_size=1,
         max_size=10,
-    )
+)
 
     async with connection_pool.acquire() as conn:
         await conn.execute("""

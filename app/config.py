@@ -1,11 +1,15 @@
-import os
+from pydantic_settings import BaseSettings
 
-from dotenv import load_dotenv
 
-load_dotenv()
+class Settings(BaseSettings):
+    db_host: str = "localhost"
+    db_name: str = "mydb"
+    db_user: str = "postgres"
+    db_password: str
+    db_port: int = 5432
 
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_NAME = os.getenv("DB_NAME", "mydb")
-DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-DB_PORT = int(os.getenv("DB_PORT", "5432"))
+    class Config:
+        env_file = ".env"
+
+
+settings = Settings()
